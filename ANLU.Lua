@@ -1,71 +1,74 @@
 -- =============================================================================
--- ANLU Hub(Rivals) - UNIVERSAL COMPATIBILITY EDITION
--- Fixed: Execution Issues / Freezing
+-- ANLU Hub(Rivals) - VOLT EXECUTOR EDITION
+-- Optimized for Mobile/Lite Executors
 -- =============================================================================
 
-print("[ANLU] Initializing...")
-
--- [ 🌟 UI LIBRARY LOAD WITH RETRY ]
-local function LoadLibrary()
-    local repo = 'https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/'
-    local success, result = pcall(function()
-        return loadstring(game:HttpGet(repo .. 'Library.lua'))()
-    end)
-    if success and result then return result end
-    warn("[ANLU] Failed to load UI Library from GitHub.")
-    return nil
-end
-
-local Library = LoadLibrary()
-if not Library then
-    print("[ANLU] FATAL: UI Library could not be loaded.")
-    return
-end
-
-local Window = Library:CreateWindow({
-    Title = 'ANLU Hub - UNIVERSAL',
-    Center = true,
-    AutoShow = true,
-})
-
-local Tabs = {
-    Main = Window:AddTab('Main'),
-    Player = Window:AddTab('Player'),
-    Visuals = Window:AddTab('Visuals'),
-    Misc = Window:AddTab('Misc'),
-}
-
--- [ Services ]
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
--- [ State ]
+-- [ 🌟 SIMPLE UI SYSTEM (No External Library for Volt Stability) ]
+local ScreenGui = Instance.new("ScreenGui", game:GetService("CoreGui"))
+local MainFrame = Instance.new("Frame", ScreenGui)
+MainFrame.Size = UDim2.new(0, 220, 0, 280)
+MainFrame.Position = UDim2.new(0.5, -110, 0.5, -140)
+MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true
+
+local Title = Instance.new("TextLabel", MainFrame)
+Title.Size = UDim2.new(1, 0, 0, 30)
+Title.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+Title.Text = " ANLU Hub - VOLT"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.TextXAlignment = Enum.TextXAlignment.Left
+
+-- [ Toggle Function Helper ]
+local function CreateToggle(name, pos, default, callback)
+    local btn = Instance.new("TextButton", MainFrame)
+    btn.Size = UDim2.new(0.9, 0, 0, 35)
+    btn.Position = UDim2.new(0.05, 0, 0, pos)
+    btn.BackgroundColor3 = default and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(150, 0, 0)
+    btn.Text = name .. (default and ": ON" or ": OFF")
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    
+    local state = default
+    btn.MouseButton1Click:Connect(function()
+        state = not state
+        btn.Text = name .. (state and ": ON" or ": OFF")
+        btn.BackgroundColor3 = state and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(150, 0, 0)
+        callback(state)
+    end)
+end
+
+-- [ 🌟 STATE ]
+local AimbotEnabled = false
+local SilentEnabled = false
+local FlyEnabled = false
+local EspEnabled = false
 local isRightMouseDown = false
-local CachedSilentTarget = nil
-local keyStates = {W = false, A = false, S = false, D = false}
+local CachedTarget = nil
 
--- [ 🌟 MAIN FEATURES ]
-local AimbotTab = Tabs.Main:AddLeftGroupbox('Aimbot')
-AimbotTab:AddToggle('AimbotEnabled', { Text = 'Enable Aimbot', Default = false })
-AimbotTab:AddSlider('Smoothness', { Text = 'Smoothing', Default = 10, Min = 1, Max = 100, Rounding = 1 })
+-- [ 🌟 FEATURES ]
+CreateToggle("Aimbot", 40, false, function(v) AimbotEnabled = v end)
+CreateToggle("Silent Aim", 85, false, function(v) SilentEnabled = v end)
+CreateToggle("Fly", 130, false, function(v) FlyEnabled = v end)
+CreateToggle("Box ESP", 175, false, function(v) EspEnabled = v end)
 
-local SilentTab = Tabs.Main:AddRightGroupbox('Silent Aim')
-SilentTab:AddToggle('SilentEnabled', { Text = 'Enable Silent Aim', Default = false })
-SilentTab:AddSlider('Radius', { Text = 'FOV Radius', Default = 300, Min = 0, Max = 1000, Rounding = 0 })
+local CloseBtn = Instance.new("TextButton", MainFrame)
+CloseBtn.Size = UDim2.new(0.9, 0, 0, 30)
+CloseBtn.Position = UDim2.new(0.05, 0, 0, 230)
+CloseBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+CloseBtn.Text = "UNLOAD"
+CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+CloseBtn.MouseButton1Click:Connect(function() ScreenGui:Destroy() end)
 
-local MovementBox = Tabs.Player:AddLeftGroupbox('Movement')
-MovementBox:AddToggle('FlyToggle', { Text = 'Enable Fly', Default = false })
-MovementBox:AddSlider('FlySpeed', { Text = 'Fly Speed', Default = 50, Min = 1, Max = 300, Rounding = 0 })
-
-local EspBox = Tabs.Visuals:AddLeftGroupbox('ESP')
-EspBox:AddToggle('EspBox', { Text = 'Box ESP', Default = false })
-
--- [ 🌟 FUNCTIONS ]
-local function getClosestPlayer()
-    local target, maxDist = nil, Options.Radius.Value
+-- [ 🌟 LOGIC ]
+local function getClosest()
+    local target, maxDist = nil, 400
     local mousePos = UserInputService:GetMouseLocation()
     for _, p in ipairs(Players:GetPlayers()) do
         if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("Head") then
@@ -79,61 +82,47 @@ local function getClosestPlayer()
     return target
 end
 
--- [ 🌟 METATABLE HOOK (SAFE) ]
-local function HookNamecall()
-    local mt = getrawmetatable(game)
-    if not mt then warn("[ANLU] getrawmetatable not supported.") return end
-    
-    local oldNamecall = mt.__namecall
-    setreadonly(mt, false)
-    mt.__namecall = newcclosure(function(self, ...)
-        local method = getnamecallmethod()
-        local args = {...}
-        if not checkcaller() and method == "FireServer" and self.Name == "UseItem" then
-            if Toggles.SilentEnabled.Value and CachedSilentTarget then
-                local head = CachedSilentTarget.Character:FindFirstChild("Head")
-                if head and args[3] and type(args[3]) == "table" and args[3]["\001"] then
-                    local data = args[3]["\001"]
-                    if data["\001"] then 
-                        data["\001"]["\001"], data["\001"]["\000"], data["\001"]["\002"] = head.Position.X, head.Position.Y, head.Position.Z 
-                    end
-                    data["\002"] = head
-                end
-            end
-        end
-        return oldNamecall(self, unpack(args))
-    end)
-    setreadonly(mt, true)
-    print("[ANLU] Metatable hooked.")
-end
-
-pcall(HookNamecall)
-
--- [ 🌟 MAIN LOOP ]
+-- [ 🌟 VOLT STABLE LOOP ]
 RunService.RenderStepped:Connect(function()
-    if Toggles.SilentEnabled.Value then CachedSilentTarget = getClosestPlayer() end
-    if Toggles.AimbotEnabled.Value and isRightMouseDown and CachedSilentTarget then
-        local head = CachedSilentTarget.Character and CachedSilentTarget.Character:FindFirstChild("Head")
+    if SilentEnabled or AimbotEnabled then CachedTarget = getClosest() end
+    
+    if AimbotEnabled and isRightMouseDown and CachedTarget then
+        local head = CachedTarget.Character:FindFirstChild("Head")
         if head then
-            local aimCFrame = CFrame.new(Camera.CFrame.Position, head.Position)
-            Camera.CFrame = Camera.CFrame:Lerp(aimCFrame, Options.Smoothness.Value / 100)
+            Camera.CFrame = Camera.CFrame:Lerp(CFrame.new(Camera.CFrame.Position, head.Position), 0.1)
         end
     end
     
     local char = LocalPlayer.Character; local hrp = char and char:FindFirstChild("HumanoidRootPart")
-    if hrp and Toggles.FlyToggle.Value then
-        local moveDir = Vector3.new(0,0,0)
-        if keyStates.W then moveDir = moveDir + Camera.CFrame.LookVector end
-        if keyStates.S then moveDir = moveDir - Camera.CFrame.LookVector end
-        if keyStates.A then moveDir = moveDir - Camera.CFrame.RightVector end
-        if keyStates.D then moveDir = moveDir + Camera.CFrame.RightVector end
-        hrp.Velocity = moveDir.Unit * Options.FlySpeed.Value
+    if hrp and FlyEnabled then
+        hrp.Velocity = Camera.CFrame.LookVector * 50
     end
 end)
 
--- [ INPUT ]
-UserInputService.InputBegan:Connect(function(i, g) if g then return end if i.UserInputType == Enum.UserInputType.MouseButton2 then isRightMouseDown = true end local code = i.KeyCode.Name; if keyStates[code] ~= nil then keyStates[code] = true end end)
-UserInputService.InputEnded:Connect(function(i, g) if i.UserInputType == Enum.UserInputType.MouseButton2 then isRightMouseDown = false end local code = i.KeyCode.Name; if keyStates[code] ~= nil then keyStates[code] = false end end)
+-- [ 🌟 METATABLE (VOLT COMPATIBLE) ]
+local mt = getrawmetatable(game)
+if mt then
+    local old = mt.__namecall
+    setreadonly(mt, false)
+    mt.__namecall = newcclosure(function(self, ...)
+        local method = getnamecallmethod()
+        if not checkcaller() and method == "FireServer" and self.Name == "UseItem" and SilentEnabled and CachedTarget then
+            local args = {...}
+            if args[3] and type(args[3]) == "table" and args[3]["\001"] then
+                local head = CachedTarget.Character:FindFirstChild("Head")
+                if head then
+                    args[3]["\001"]["\001"] = {["\001"] = head.Position.X, ["\000"] = head.Position.Y, ["\002"] = head.Position.Z}
+                    args[3]["\001"]["\002"] = head
+                end
+            end
+            return old(self, unpack(args))
+        end
+        return old(self, ...)
+    end)
+    setreadonly(mt, true)
+end
 
-print("[ANLU] Script fully loaded.")
-Library:Notify("ANLU Hub Loaded!", 5)
+UserInputService.InputBegan:Connect(function(i, g) if not g and i.UserInputType == Enum.UserInputType.MouseButton2 then isRightMouseDown = true end end)
+UserInputService.InputEnded:Connect(function(i, g) if i.UserInputType == Enum.UserInputType.MouseButton2 then isRightMouseDown = false end end)
+
+print("ANLU Hub Volt Loaded!")
