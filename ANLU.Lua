@@ -1,6 +1,6 @@
 -- =============================================================================
--- ANLU Hub(Rivals) - ULTIMATE INTEGRATED EDITION
--- Optimized Performance + Synced Aimbot + All Features Included
+-- ANLU Hub(Rivals) - FINAL FULL INTEGRATED EDITION
+-- Optimized + Synced Aimbot + All Original Features (World & UI Settings)
 -- =============================================================================
 
 local Players = game:GetService("Players")
@@ -35,7 +35,7 @@ local ThemeManager = loadstring(game:HttpGet(repo .. 'addons/ThemeManager.lua'))
 local SaveManager = loadstring(game:HttpGet(repo .. 'addons/SaveManager.lua'))()
 
 local Window = Library:CreateWindow({
-    Title = 'ANLU Hub(Rivals) - ULTIMATE INTEGRATED',
+    Title = 'ANLU Hub(Rivals) - FULL EDITION',
     Center = true,
     AutoShow = true,
     TabPadding = 8,
@@ -57,6 +57,7 @@ local isClicking, isRightMouseDown = false, false
 local espCache = {}
 local CachedSilentTarget = nil
 local keyStates = { W = false, A = false, S = false, D = false, Space = false, LeftControl = false }
+local rainPE, snowPE = nil, nil
 
 local FOVCircle = Drawing.new("Circle")
 FOVCircle.Color = Color3_fromRGB(255, 0, 50)
@@ -121,7 +122,7 @@ local function InitUnlockAll()
     end
 end
 
--- [ UI SECTIONS ]
+-- [ 1. MAIN TAB ]
 local AimbotTab = Tabs.Main:AddLeftGroupbox('Camera Lock-on Aimbot')
 AimbotTab:AddToggle('AimbotEnabled', { Text = 'Enable Camera Aimbot', Default = false })
 AimbotTab:AddSlider('Smoothness', { Text = 'Aimbot Smoothing', Default = 8, Min = 1, Max = 100, Rounding = 1 })
@@ -142,6 +143,7 @@ SilentTab:AddToggle('ShowFOV', { Text = 'Show FOV Circle', Default = false })
 SilentTab:AddSlider('Radius', { Text = 'FOV Radius', Default = 400, Min = 0, Max = 1000, Rounding = 0 })
 SilentTab:AddSlider('HitChance', { Text = 'Hit Chance (%)', Default = 100, Min = 0, Max = 100, Rounding = 0 })
 
+-- [ 2. PLAYER TAB ]
 local FlyGroupBox = Tabs.Player:AddLeftGroupbox('Flight Control')
 FlyGroupBox:AddToggle('FlyToggle', { Text = 'Enable Fly', Default = false })
 FlyGroupBox:AddSlider('FlySpeed', { Text = 'Fly Speed', Default = 50, Min = 1, Max = 300, Rounding = 0 })
@@ -152,12 +154,45 @@ MovementGroupBox:AddToggle('OrbitToggle', { Text = 'Enable Orbit', Default = fal
 MovementGroupBox:AddToggle('AutoStrafeToggle', { Text = 'Enable Auto-Strafe', Default = false })
 MovementGroupBox:AddSlider('AutoStrafeSpeed', { Text = 'Auto-Strafe Speed', Default = 50, Min = 1, Max = 200, Rounding = 0 })
 
+-- [ 3. VISUALS TAB ]
 local EspGroupBox = Tabs.Visuals:AddLeftGroupbox('ESP')
 EspGroupBox:AddToggle('EspBox', { Text = 'Box ESP', Default = false })
 EspGroupBox:AddToggle('EspSkeleton', { Text = 'Skeleton ESP', Default = false })
 EspGroupBox:AddToggle('EspHealthBar', { Text = 'Health Bar', Default = false })
 EspGroupBox:AddToggle('EspName', { Text = 'Player Names', Default = false })
 
+-- [ 4. WORLD TAB ]
+local WorldGroupBox = Tabs.World:AddLeftGroupbox('Atmosphere & Lighting')
+WorldGroupBox:AddToggle('Fullbright', { Text = 'Enable Fullbright', Default = false }):OnChanged(function()
+    Lighting.Brightness = Toggles.Fullbright.Value and 2 or 1
+    Lighting.ClockTime = Toggles.Fullbright.Value and 12 or Lighting.ClockTime
+end)
+
+local weatherAnchor = Instance.new("Part", workspace)
+weatherAnchor.Anchored = true; weatherAnchor.CanCollide = false; weatherAnchor.Transparency = 1; weatherAnchor.Size = Vector3_new(1,1,1)
+
+local WeatherGroupBox = Tabs.World:AddRightGroupbox('Weather Effects')
+WeatherGroupBox:AddToggle('SnowEffect', { Text = 'Enable Snow Effect', Default = false }):OnChanged(function()
+    if Toggles.SnowEffect.Value then
+        if not snowPE then
+            snowPE = Instance.new("ParticleEmitter", weatherAnchor)
+            snowPE.Texture = "rbxassetid://242292026"; snowPE.Size = NumberSequence.new(0.3); snowPE.Lifetime = NumberRange.new(2, 4)
+            snowPE.Rate = 200; snowPE.Speed = NumberRange.new(20, 50); snowPE.Acceleration = Vector3_new(0, -10, 0)
+        end
+    else if snowPE then snowPE:Destroy(); snowPE = nil end end
+end)
+
+WeatherGroupBox:AddToggle('RainEffect', { Text = 'Enable Rain Effect', Default = false }):OnChanged(function()
+    if Toggles.RainEffect.Value then
+        if not rainPE then
+            rainPE = Instance.new("ParticleEmitter", weatherAnchor)
+            rainPE.Texture = "rbxassetid://363276166"; rainPE.Size = NumberSequence.new(0.2); rainPE.Lifetime = NumberRange.new(1, 1.5)
+            rainPE.Rate = 500; rainPE.Speed = NumberRange.new(90, 130); rainPE.Acceleration = Vector3_new(-15, -50, 0)
+        end
+    else if rainPE then rainPE:Destroy(); rainPE = nil end end
+end)
+
+-- [ 5. MISC TAB ]
 local WeaponModBox = Tabs.Misc:AddLeftGroupbox('Weapon Mods')
 WeaponModBox:AddToggle('FastFireToggle', { Text = 'Enable Multi-Packet Fire', Default = false })
 WeaponModBox:AddSlider('FireRateMultiplier', { Text = 'Packet Multiplier', Default = 10, Min = 1, Max = 50, Rounding = 0 })
@@ -166,17 +201,42 @@ WeaponModBox:AddToggle('RapidFireToggle', { Text = '극한 연사', Default = fa
 WeaponModBox:AddSlider('RapidFireDelay', { Text = '연사 딜레이', Default = 0.01, Min = 0.00, Max = 0.2, Rounding = 3 })
 WeaponModBox:AddToggle('UnlockAllToggle', { Text = 'Unlock All Cosmetics', Default = false }):OnChanged(function() _G.UnlockAllActive = Toggles.UnlockAllToggle.Value; InitUnlockAll() end)
 
+local SpooferBox = Tabs.Misc:AddRightGroupbox('System Spoofer')
+SpooferBox:AddDropdown('DeviceMode', { Values = { 'PC', 'Mobile', 'Console', 'VR' }, Default = 1, Text = 'Spoof Device' }):OnChanged(function()
+    pcall(function()
+        local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+        if remotes then
+            local setControls = remotes:WaitForChild("Replication"):WaitForChild("Fighter"):WaitForChild("SetControls")
+            local target = "MouseKeyboard"
+            if Options.DeviceMode.Value == "Mobile" then target = "Touch" elseif Options.DeviceMode.Value == "Console" then target = "Gamepad" elseif Options.DeviceMode.Value == "VR" then target = "VR" end
+            setControls:FireServer(target)
+        end
+    end)
+end)
+
+-- [ 6. UI SETTINGS TAB ]
+local MenuGroup = Tabs['UI Settings']:AddLeftGroupbox('Menu Options')
+MenuGroup:AddButton('Unload Script', function() 
+    pcall(function() FOVCircle:Destroy(); if weatherAnchor then weatherAnchor:Destroy() end end)
+    Library:Unload() 
+end)
+MenuGroup:AddLabel('Menu Bind'):AddKeyPicker('MenuKeybind', { Default = 'RightShift', NoUI = true, Text = 'Menu keybind' })
+Library.ToggleKeybind = Options.MenuKeybind
+
+ThemeManager:SetLibrary(Library); SaveManager:SetLibrary(Library)
+ThemeManager:SetFolder('ANLUHub'); SaveManager:SetFolder('ANLUHub/Rivals')
+SaveManager:BuildConfigSection(Tabs['UI Settings']); ThemeManager:ApplyToTab(Tabs['UI Settings'])
+SaveManager:LoadAutoloadConfig()
+
 -- [ 🌟 BACKEND CORE ENGINE ]
 
 local function getClosestPlayerToMouse()
     if not Options.Radius then return nil end
     local target, maxDist = nil, Options.Radius.Value
     local mousePos = UserInputService:GetMouseLocation()
-
     for _, p in ipairs(Players:GetPlayers()) do
         if p == LocalPlayer then continue end
-        local char = p.Character
-        local head = char and char:FindFirstChild("Head")
+        local char = p.Character; local head = char and char:FindFirstChild("Head")
         if head then
             local screenPos, onScreen = Camera:WorldToViewportPoint(head.Position)
             if onScreen then
@@ -197,20 +257,13 @@ local function updateEsp()
             d.Box.Thickness = 1.5; d.Box.Filled = false; d.HealthOutline.Filled = true; d.HealthOutline.Color = Color3_fromRGB(0,0,0)
             d.HealthBar.Filled = true; d.TopGui.AlwaysOnTop = true; d.TopGui.Size = UDim2.new(0, 200, 0, 50)
             d.TopLabel.Size = UDim2.new(1,0,1,0); d.TopLabel.BackgroundTransparency = 1; d.TopLabel.Font = Enum.Font.SourceSansBold; d.TopLabel.TextSize = 14; d.TopLabel.Parent = d.TopGui
-            d.TopGui.Parent = CoreGui
-            espCache[player] = d 
+            d.TopGui.Parent = CoreGui; espCache[player] = d 
         end
-
-        local char = player.Character
-        local hrp = char and char:FindFirstChild("HumanoidRootPart")
-        local head = char and char:FindFirstChild("Head")
-        local hum = char and char:FindFirstChildOfClass("Humanoid")
-
+        local char = player.Character; local hrp = char and char:FindFirstChild("HumanoidRootPart"); local head = char and char:FindFirstChild("Head"); local hum = char and char:FindFirstChildOfClass("Humanoid")
         if hrp and head and hum and hum.Health > 0 then
             local _, onScreen = Camera:WorldToViewportPoint(hrp.Position)
             if onScreen then
-                local top, topOn = Camera:WorldToViewportPoint(head.Position + Vector3_new(0, 1.8, 0))
-                local bot, botOn = Camera:WorldToViewportPoint(hrp.Position - Vector3_new(0, 3.2, 0))
+                local top, topOn = Camera:WorldToViewportPoint(head.Position + Vector3_new(0, 1.8, 0)); local bot, botOn = Camera:WorldToViewportPoint(hrp.Position - Vector3_new(0, 3.2, 0))
                 if topOn and botOn then
                     local sizeY = math_abs(top.Y - bot.Y); local sizeX = sizeY * 0.65; local boxPos = Vector2_new(top.X - (sizeX / 2), top.Y)
                     d.Box.Visible = Toggles.EspBox.Value; if d.Box.Visible then d.Box.Size = Vector2_new(sizeX, sizeY); d.Box.Position = boxPos; d.Box.Color = Color3_fromRGB(255,255,255) end
@@ -226,10 +279,8 @@ local function updateEsp()
     end
 end
 
--- [ 🌟 UNIFIED METATABLE HOOKING ]
-local mt = getrawmetatable(game)
-local oldNamecall = mt.__namecall
-setreadonly(mt, false)
+-- [ 🌟 METATABLE ]
+local mt = getrawmetatable(game); local oldNamecall = mt.__namecall; setreadonly(mt, false)
 mt.__namecall = newcclosure(function(self, ...)
     local method = getnamecallmethod(); local args = {...}
     if not checkcaller() and method == "FireServer" and self.Name == "UseItem" then
@@ -257,18 +308,13 @@ task_spawn(function()
         local dt = task_wait()
         pcall(updateEsp)
         if Toggles.SilentEnabled.Value then CachedSilentTarget = getClosestPlayerToMouse() end
-        
-        -- SYNCED AIMBOT
         if Toggles.AimbotEnabled.Value and isRightMouseDown and CachedSilentTarget then
             local head = CachedSilentTarget.Character and CachedSilentTarget.Character:FindFirstChild(Options.AimbotPart.Value)
             if head then
-                local targetPos = head.Position + Vector3_new(0, Options.DropCompensation.Value, 0)
-                local aimCFrame = CFrame_new(Camera.CFrame.Position, targetPos)
+                local aimCFrame = CFrame_new(Camera.CFrame.Position, head.Position + Vector3_new(0, Options.DropCompensation.Value, 0))
                 Camera.CFrame = Camera.CFrame:Lerp(aimCFrame, math.clamp(Options.Smoothness.Value / 100, 0.01, 1))
             end
         end
-
-        -- MOVEMENT
         local char = LocalPlayer.Character; local hrp = char and char:FindFirstChild("HumanoidRootPart")
         if hrp then
             if Toggles.FlyToggle.Value then
@@ -283,12 +329,9 @@ task_spawn(function()
                 angle = angle + (Options.AutoStrafeSpeed.Value * dt)
                 hrp.CFrame = hrp.CFrame + (hrp.CFrame.RightVector * math.sin(angle) * 2)
             end
+            if weatherAnchor then weatherAnchor.CFrame = CFrame_new(hrp.Position + Vector3_new(0, 25, 0)) end
         end
-
-        -- FOV CIRCLE
-        if Toggles.ShowFOV.Value then
-            FOVCircle.Position = UserInputService:GetMouseLocation(); FOVCircle.Radius = Options.Radius.Value; FOVCircle.Visible = true
-        else FOVCircle.Visible = false end
+        if Toggles.ShowFOV.Value then FOVCircle.Position = UserInputService:GetMouseLocation(); FOVCircle.Radius = Options.Radius.Value; FOVCircle.Visible = true else FOVCircle.Visible = false end
     end
 end)
 
@@ -296,4 +339,4 @@ end)
 UserInputService.InputBegan:Connect(function(i, g) if g then return end if i.UserInputType == Enum.UserInputType.MouseButton1 then isClicking = true elseif i.UserInputType == Enum.UserInputType.MouseButton2 then isRightMouseDown = true end local code = i.KeyCode.Name; if keyStates[code] ~= nil then keyStates[code] = true end end)
 UserInputService.InputEnded:Connect(function(i, g) if i.UserInputType == Enum.UserInputType.MouseButton1 then isClicking = false elseif i.UserInputType == Enum.UserInputType.MouseButton2 then isRightMouseDown = false end local code = i.KeyCode.Name; if keyStates[code] ~= nil then keyStates[code] = false end end)
 
-Library:Notify("ANLU Hub ULTIMATE Loaded!", 5)
+Library:Notify("ANLU Hub FINAL FULL Loaded!", 5)
